@@ -1,6 +1,6 @@
 (* Author: Asta Halkjær From, DTU Compute *)
 
-theory System_A_ESSLLI imports "HOL-Library.Countable" begin
+theory System_A imports "HOL-Library.Countable" begin
 
 section \<open>Syntax\<close>
 
@@ -8,6 +8,8 @@ datatype form
   = Falsity (\<open>\<^bold>\<bottom>\<close>)
   | Pro nat
   | Imp form form (infixr \<open>\<^bold>\<longrightarrow>\<close> 25)
+  | Dis form form (infixr \<open>\<^bold>\<or>\<close> 30)
+  | Con form form (infixr \<open>\<^bold>\<and>\<close> 35)
 
 abbreviation Truth (\<open>\<^bold>\<top>\<close>) where \<open>\<^bold>\<top> \<equiv> \<^bold>\<bottom> \<^bold>\<longrightarrow> \<^bold>\<bottom>\<close>
 
@@ -19,6 +21,8 @@ primrec semantics :: \<open>(nat \<Rightarrow> bool) \<Rightarrow> form \<Righta
   \<open>(I \<Turnstile> \<^bold>\<bottom>) = False\<close>
 | \<open>(I \<Turnstile> Pro n) = I n\<close>
 | \<open>(I \<Turnstile> (p \<^bold>\<longrightarrow> q)) = ((I \<Turnstile> p) \<longrightarrow> (I \<Turnstile> q))\<close>
+| \<open>(I \<Turnstile> (p \<^bold>\<or> q)) = ((I \<Turnstile> p) \<or> (I \<Turnstile> q))\<close>
+| \<open>(I \<Turnstile> (p \<^bold>\<and> q)) = ((I \<Turnstile> p) \<and> (I \<Turnstile> q))\<close>
 
 section \<open>Axiomatics\<close>
 
@@ -26,6 +30,12 @@ inductive Axiomatics :: \<open>form \<Rightarrow> bool\<close> (\<open>\<turnsti
   MP: \<open>\<turnstile> p \<Longrightarrow> \<turnstile> (p \<^bold>\<longrightarrow> q) \<Longrightarrow> \<turnstile> q\<close>
 | Imp1: \<open>\<turnstile> (p \<^bold>\<longrightarrow> q \<^bold>\<longrightarrow> p)\<close>
 | Imp2: \<open>\<turnstile> ((p \<^bold>\<longrightarrow> q \<^bold>\<longrightarrow> r) \<^bold>\<longrightarrow> (p \<^bold>\<longrightarrow> q) \<^bold>\<longrightarrow> p \<^bold>\<longrightarrow> r)\<close>
+| DisE: \<open>\<turnstile> ((p \<^bold>\<longrightarrow> r) \<^bold>\<longrightarrow> (q \<^bold>\<longrightarrow> r) \<^bold>\<longrightarrow> p \<^bold>\<or> q \<^bold>\<longrightarrow> r)\<close>
+| DisI1: \<open>\<turnstile> (p \<^bold>\<longrightarrow> p \<^bold>\<or> q)\<close>
+| DisI2: \<open>\<turnstile> (q \<^bold>\<longrightarrow> p \<^bold>\<or> q)\<close>
+| ConE1: \<open>\<turnstile> (p \<^bold>\<and> q \<^bold>\<longrightarrow> p)\<close>
+| ConE2: \<open>\<turnstile> (p \<^bold>\<and> q \<^bold>\<longrightarrow> q)\<close>
+| ConI: \<open>\<turnstile> (p \<^bold>\<longrightarrow> q \<^bold>\<longrightarrow> p \<^bold>\<and> q)\<close>
 | Neg: \<open>\<turnstile> (((p \<^bold>\<longrightarrow> \<^bold>\<bottom>) \<^bold>\<longrightarrow> \<^bold>\<bottom>) \<^bold>\<longrightarrow> p)\<close>
 
 section \<open>Soundness\<close>
@@ -249,7 +259,11 @@ locale Hintikka =
     NoFalsity: \<open>\<^bold>\<bottom> \<notin> H\<close> and
     Pro: \<open>Pro n \<in> H \<Longrightarrow> (\<^bold>\<not> Pro n) \<notin> H\<close> and
     ImpP: \<open>(p \<^bold>\<longrightarrow> q) \<in> H \<Longrightarrow> (\<^bold>\<not> p) \<in> H \<or> q \<in> H\<close> and
-    ImpN: \<open>(\<^bold>\<not> (p \<^bold>\<longrightarrow> q)) \<in> H \<Longrightarrow> p \<in> H \<and> (\<^bold>\<not> q) \<in> H\<close>
+    ImpN: \<open>(\<^bold>\<not> (p \<^bold>\<longrightarrow> q)) \<in> H \<Longrightarrow> p \<in> H \<and> (\<^bold>\<not> q) \<in> H\<close> and
+    DisP: \<open>(p \<^bold>\<or> q) \<in> H \<Longrightarrow> p \<in> H \<or> q \<in> H\<close> and
+    DisN: \<open>(\<^bold>\<not> (p \<^bold>\<or> q)) \<in> H \<Longrightarrow> (\<^bold>\<not> p) \<in> H \<and> (\<^bold>\<not> q) \<in> H\<close> and
+    ConP: \<open>(p \<^bold>\<and> q) \<in> H \<Longrightarrow> p \<in> H \<and> q \<in> H\<close> and
+    ConN: \<open>(\<^bold>\<not> (p \<^bold>\<and> q)) \<in> H \<Longrightarrow> (\<^bold>\<not> p) \<in> H \<or> (\<^bold>\<not> q) \<in> H\<close>
 
 abbreviation (input) \<open>model H n \<equiv> Pro n \<in> H\<close>
 
@@ -343,6 +357,129 @@ next
       using cut' by blast
     moreover have \<open>set ((\<^bold>\<not> (p \<^bold>\<longrightarrow> q)) # S') \<subseteq> S\<close>
       using *(1) S'(2) by fastforce
+    ultimately show False
+      using assms unfolding consistent_def by blast
+  qed
+next
+  fix p q
+  assume *: \<open>(p \<^bold>\<or> q) \<in> S\<close>
+  show \<open>p \<in> S \<or> q \<in> S\<close>
+  proof (rule disjCI, rule ccontr)
+    assume \<open>q \<notin> S\<close>
+    then obtain Sq' where Sq': \<open>\<turnstile> imply (q # Sq') \<^bold>\<bottom>\<close> \<open>set Sq' \<subseteq> S - {q}\<close>
+      using assms inconsistent_head by blast
+
+    assume \<open>p \<notin> S\<close>
+    then obtain Sp' where Sp': \<open>\<turnstile> imply (p # Sp') \<^bold>\<bottom>\<close> \<open>set Sp' \<subseteq> S - {p}\<close>
+      using assms inconsistent_head by blast
+    obtain S' where S': \<open>set S' = set Sp' \<union> set Sq'\<close>
+      by (meson set_append)
+    then have \<open>\<turnstile> imply (p # S') \<^bold>\<bottom>\<close> \<open>\<turnstile> imply (q # S') \<^bold>\<bottom>\<close>
+    proof -
+      have \<open>set Sp' \<subseteq> set S'\<close>
+        using S' by blast
+      then show \<open>\<turnstile> imply (p # S') \<^bold>\<bottom>\<close>
+        by (metis Sp'(1) deduct imply_weaken)
+      have \<open>set Sq' \<subseteq> set S'\<close>
+        using S' by blast
+      then show \<open>\<turnstile> imply (q # S') \<^bold>\<bottom>\<close>
+        by (metis Sq'(1) deduct imply_weaken)
+    qed
+    then have \<open>\<turnstile> imply ((p \<^bold>\<or> q) # S') \<^bold>\<bottom>\<close>
+      by (metis Axiomatics.simps imply.simps(2))
+    moreover have \<open>set ((p \<^bold>\<or> q) # S') \<subseteq> S\<close>
+      using * S' Sp'(2) Sq'(2) by auto
+    ultimately show False
+      using assms unfolding consistent_def by blast
+  qed
+next
+  fix p q
+  assume *: \<open>(\<^bold>\<not> (p \<^bold>\<or> q)) \<in> S\<close>
+  show \<open>(\<^bold>\<not> p) \<in> S \<and> (\<^bold>\<not> q) \<in> S\<close>
+  proof (rule conjI; rule ccontr)
+    assume \<open>(\<^bold>\<not> p) \<notin> S\<close>
+    then obtain S' where S': \<open>\<turnstile> imply ((\<^bold>\<not> p) # S') \<^bold>\<bottom>\<close> \<open>set S' \<subseteq> S - {\<^bold>\<not> p}\<close>
+      using assms inconsistent_head by blast
+    moreover have \<open>\<turnstile> imply ((\<^bold>\<not> (p \<^bold>\<or> q)) # S') (\<^bold>\<not> p)\<close>
+      using DisI1 Imp4 add_imply deduct MP by blast
+    ultimately have \<open>\<turnstile> imply ((\<^bold>\<not> (p \<^bold>\<or> q)) # S') \<^bold>\<bottom>\<close>
+      using cut' by blast
+    moreover have \<open>set ((\<^bold>\<not> (p \<^bold>\<or> q)) # S') \<subseteq> S\<close>
+      using * S'(2) by auto
+    ultimately show False
+      using assms unfolding consistent_def by blast
+  next
+    assume \<open>(\<^bold>\<not> q) \<notin> S\<close>
+    then obtain S' where S': \<open>\<turnstile> imply ((\<^bold>\<not> q) # S') \<^bold>\<bottom>\<close> \<open>set S' \<subseteq> S - {\<^bold>\<not> q}\<close>
+      using assms inconsistent_head by blast
+    moreover have \<open>\<turnstile> imply ((\<^bold>\<not> (p \<^bold>\<or> q)) # S') (\<^bold>\<not> q)\<close>
+      using DisI2 Imp4 add_imply deduct MP by blast
+    ultimately have \<open>\<turnstile> imply ((\<^bold>\<not> (p \<^bold>\<or> q)) # S') \<^bold>\<bottom>\<close>
+      using cut' by blast
+    moreover have \<open>set ((\<^bold>\<not> (p \<^bold>\<or> q)) # S') \<subseteq> S\<close>
+      using *(1) S'(2) by auto
+    ultimately show False
+      using assms unfolding consistent_def by blast
+  qed
+next
+  fix p q
+  assume *: \<open>(p \<^bold>\<and> q) \<in> S\<close>
+  show \<open>p \<in> S \<and> q \<in> S\<close>
+  proof (rule conjI; rule ccontr)
+    assume \<open>p \<notin> S\<close>
+    then obtain S' where S': \<open>\<turnstile> imply (p # S') \<^bold>\<bottom>\<close> \<open>set S' \<subseteq> S - {p}\<close>
+      using assms inconsistent_head by blast
+    moreover have \<open>\<turnstile> imply ((p \<^bold>\<and> q) # S') p\<close>
+      using ConE1 add_imply deduct by blast
+    ultimately have \<open>\<turnstile> imply ((p \<^bold>\<and> q) # S') \<^bold>\<bottom>\<close>
+      using cut' by blast
+    moreover have \<open>set ((p \<^bold>\<and> q) # S') \<subseteq> S\<close>
+      using *(1) S'(2) by auto
+    ultimately show False
+      using assms unfolding consistent_def by blast
+  next
+    assume \<open>q \<notin> S\<close>
+    then obtain S' where S': \<open>\<turnstile> imply (q # S') \<^bold>\<bottom>\<close> \<open>set S' \<subseteq> S - {q}\<close>
+      using assms inconsistent_head by blast
+    moreover have \<open>\<turnstile> imply ((p \<^bold>\<and> q) # S') q\<close>
+      using ConE2 add_imply deduct by blast
+    ultimately have \<open>\<turnstile> imply ((p \<^bold>\<and> q) # S') \<^bold>\<bottom>\<close>
+      using cut' by blast
+    moreover have \<open>set ((p \<^bold>\<and> q) # S') \<subseteq> S\<close>
+      using *(1) S'(2) S'(2) by auto
+    ultimately show False
+      using assms unfolding consistent_def by blast
+  qed
+next
+  fix p q
+  assume *: \<open>(\<^bold>\<not> (p \<^bold>\<and> q)) \<in> S\<close>
+  show \<open>(\<^bold>\<not> p) \<in> S \<or> (\<^bold>\<not> q) \<in> S\<close>
+  proof (rule disjCI, rule ccontr)
+    assume \<open>(\<^bold>\<not> q) \<notin> S\<close>
+    then obtain Sq' where Sq': \<open>\<turnstile> imply ((\<^bold>\<not> q) # Sq') \<^bold>\<bottom>\<close> \<open>set Sq' \<subseteq> S - {\<^bold>\<not> q}\<close>
+      using assms inconsistent_head by blast
+
+    assume \<open>(\<^bold>\<not> p) \<notin> S\<close>
+    then obtain Sp' where Sp': \<open>\<turnstile> imply ((\<^bold>\<not> p) # Sp') \<^bold>\<bottom>\<close> \<open>set Sp' \<subseteq> S - {\<^bold>\<not> p}\<close>
+      using assms inconsistent_head by blast
+
+    obtain S' where S': \<open>set S' = set Sp' \<union> set Sq'\<close>
+      by (meson set_append)
+    then have \<open>\<turnstile> imply ((\<^bold>\<not> p) # S') \<^bold>\<bottom>\<close> \<open>\<turnstile> imply ((\<^bold>\<not> q) # S') \<^bold>\<bottom>\<close>
+    proof -
+      have \<open>set Sp' \<subseteq> set S'\<close>
+        using S' by blast
+      then show \<open>\<turnstile> imply ((\<^bold>\<not> p) # S') \<^bold>\<bottom>\<close>
+        by (metis Sp'(1) deduct imply_weaken)
+      have \<open>set Sq' \<subseteq> set S'\<close>
+        using S' by blast
+      then show \<open>\<turnstile> imply ((\<^bold>\<not> q) # S') \<^bold>\<bottom>\<close>
+        by (metis Sq'(1) deduct imply_weaken)
+    qed
+    then have \<open>\<turnstile> imply ((\<^bold>\<not> (p \<^bold>\<and> q)) # S') \<^bold>\<bottom>\<close>
+      by (metis ConI Boole add_imply imply_Cons imply_head imply_mp')
+    moreover have \<open>set ((\<^bold>\<not> (p \<^bold>\<and> q)) # S') \<subseteq> S\<close>
+      using *(1) S' Sp'(2) Sq'(2) by auto
     ultimately show False
       using assms unfolding consistent_def by blast
   qed
