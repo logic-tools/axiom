@@ -196,9 +196,6 @@ definition Extend :: \<open>form set \<Rightarrow> (nat \<Rightarrow> form) \<Ri
 lemma Extend_subset: \<open>S \<subseteq> Extend S f\<close>
   unfolding Extend_def by (metis Union_upper extend.simps(1) range_eqI)
 
-lemma extend_chain: \<open>extend S f n \<subseteq> extend S f (Suc n)\<close>
-  by auto
-
 lemma extend_bound: \<open>(\<Union>n \<le> m. extend S f n) = extend S f m\<close>
   by (induct m) (simp_all add: atMost_Suc)
 
@@ -241,9 +238,7 @@ proof (rule ccontr)
     using \<open>p \<notin> Extend S f\<close> unfolding Extend_def by blast
   then have \<open>\<not> consistent ({p} \<union> extend S f k)\<close>
     using n by fastforce
-  moreover have \<open>p \<notin> extend S f k\<close>
-    using \<open>p \<notin> extend S f (Suc k)\<close> extend_chain by blast
-  then have \<open>{p} \<union> extend S f k \<subseteq> {p} \<union> Extend S f\<close>
+  moreover have \<open>{p} \<union> extend S f k \<subseteq> {p} \<union> Extend S f\<close>
     unfolding Extend_def by blast
   ultimately have \<open>\<not> consistent ({p} \<union> Extend S f)\<close>
     unfolding consistent_def by fastforce
