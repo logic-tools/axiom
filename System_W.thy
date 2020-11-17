@@ -494,7 +494,7 @@ lemma surj_from_nat: \<open>surj from_nat\<close>
 section \<open>Completeness\<close>
 
 lemma imply_completeness:
-  assumes valid: \<open>\<forall>I s. list_all (\<lambda>q. (I \<Turnstile> q)) ps \<longrightarrow> (I \<Turnstile> p)\<close>
+  assumes valid: \<open>\<forall>I. list_all (\<lambda>q. (I \<Turnstile> q)) ps \<longrightarrow> (I \<Turnstile> p)\<close>
   shows \<open>\<turnstile> (imply ps p)\<close>
 proof (rule ccontr)
   assume \<open>\<not> \<turnstile> (imply ps p)\<close>
