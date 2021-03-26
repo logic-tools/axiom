@@ -1,34 +1,35 @@
 (*
-   Authors: Asta Halkjær From & Jørgen Villadsen, DTU Compute
+   Authors: Asta Halkjær From, Jens Carl Moesgård Eschen & Jørgen Villadsen, DTU Compute
 *)
 
-chapter \<open>Formalizing Wajsberg's Axioms for Propositional Logic\<close>
+chapter \<open>Formalizing Rasiowa's Axioms for Propositional Logic\<close>
 
-theory System_W imports Main begin
+theory System_R imports Main begin
 
 text \<open>All references are to Alonzo Church (1956): Introduction to Mathematical Logic\<close>
 
 section \<open>Syntax / Axiomatics / Semantics\<close>
 
-datatype form = Falsity (\<open>\<bottom>\<close>) | Pro nat | Imp form form (infix \<open>\<rightarrow>\<close> 0)
+datatype form = Pro nat | Neg form | Dis form form (infix \<open>\<Or>\<close> 0)
 
-text \<open>Wajsberg 1937 building on work by Frege, Tarski and Bernays [Church page 159]\<close>
+abbreviation Imp (infix \<open>\<rightarrow>\<close> 0) where \<open>(p \<rightarrow> q) \<equiv> (Neg p \<Or> q)\<close>
+
+text \<open>Rasiowa 1949 building on Russell 1908, Bernays 1926 and Götlind 1947 [Church page 157]\<close>
 
 inductive Axiomatics (\<open>\<turnstile>\<close>) where
   \<open>\<turnstile> q\<close> if \<open>\<turnstile> p\<close> and \<open>\<turnstile> (p \<rightarrow> q)\<close> |
-  \<open>\<turnstile> (p \<rightarrow> (q \<rightarrow> p))\<close> |
-  \<open>\<turnstile> ((p \<rightarrow> q) \<rightarrow> ((q \<rightarrow> r) \<rightarrow> (p \<rightarrow> r)))\<close> |
-  \<open>\<turnstile> (((p \<rightarrow> q) \<rightarrow> p) \<rightarrow> p)\<close> |
-  \<open>\<turnstile> (\<bottom> \<rightarrow> p)\<close>
+  \<open>\<turnstile> ((p \<Or> p) \<rightarrow> p)\<close> |
+  \<open>\<turnstile> (p \<rightarrow> (p \<Or> q))\<close> |
+  \<open>\<turnstile> ((p \<rightarrow> q) \<rightarrow> ((r \<Or> p) \<rightarrow> (q \<Or> r)))\<close>
 
-abbreviation Truth (\<open>\<top>\<close>) where \<open>\<top> \<equiv> (\<bottom> \<rightarrow> \<bottom>)\<close>
+abbreviation Truth (\<open>\<top>\<close>) where \<open>\<top> \<equiv> (undefined \<rightarrow> undefined)\<close>
 
-theorem \<open>\<turnstile> \<top>\<close> using Axiomatics.intros(5) .
+theorem \<open>\<turnstile> \<top>\<close> using Axiomatics.intros by metis
 
 primrec semantics (infix \<open>\<Turnstile>\<close> 0) where
-  \<open>(I \<Turnstile> \<bottom>) = False\<close> |
-  \<open>(I \<Turnstile> (Pro n)) = I n\<close> |
-  \<open>(I \<Turnstile> (p \<rightarrow> q)) = (if I \<Turnstile> p then I \<Turnstile> q else True)\<close>
+  \<open>(I \<Turnstile> Pro n) = I n\<close> |
+  \<open>(I \<Turnstile> Neg p) = (if I \<Turnstile> p then False else True)\<close> |
+  \<open>(I \<Turnstile> (p \<Or> q)) = (if I \<Turnstile> p then True else (I \<Turnstile> q))\<close>
 
 theorem \<open>I \<Turnstile> p\<close> if \<open>\<turnstile> p\<close> using that by induct auto
 
@@ -36,13 +37,14 @@ definition \<open>valid p \<equiv> \<forall>I. (I \<Turnstile> p)\<close>
 
 theorem \<open>valid p = \<turnstile> p\<close> oops \<comment> \<open>Proof at end\<close>
 
-abbreviation (input) \<open>Neg p \<equiv> (p \<rightarrow> \<bottom>)\<close>
+abbreviation Falsity (\<open>\<bottom>\<close>) where \<open>\<bottom> \<equiv> Neg \<top>\<close>
+
+theorem \<open>\<turnstile> (\<bottom> \<rightarrow> p)\<close> using Axiomatics.intros by metis
 
 lemmas MP = Axiomatics.intros(1)
-lemmas Imp1 = Axiomatics.intros(2)
-lemmas Tran = Axiomatics.intros(3)
-lemmas Clas = Axiomatics.intros(4)
-lemmas Expl = Axiomatics.intros(5)
+lemmas Idem = Axiomatics.intros(2)
+lemmas AddR = Axiomatics.intros(3)
+lemmas Swap = Axiomatics.intros(4)
 
 section \<open>Soundness\<close>
 
@@ -51,65 +53,104 @@ theorem soundness: \<open>\<turnstile> p \<Longrightarrow> I \<Turnstile> p\<clo
 
 section \<open>Derived Rules\<close>
 
-lemma Chu1: \<open>\<turnstile> ((p \<rightarrow> (p \<rightarrow> q)) \<rightarrow> (p \<rightarrow> q))\<close>
-  by (meson Tran Clas MP)
+proposition alternative_axiom: \<open>\<turnstile> (p \<rightarrow> (p \<Or> q))\<close> if \<open>\<And>p q. \<turnstile> (p \<rightarrow> (q \<Or> p))\<close>
+  by (metis MP Idem Swap that)
 
-lemma Chu2: \<open>\<turnstile> (p \<rightarrow> ((p \<rightarrow> q) \<rightarrow> q))\<close>
-  by (meson Chu1 Imp1 Tran MP)
+lemma AddL: \<open>\<turnstile> (p \<rightarrow> (q \<Or> p))\<close>
+  by (metis MP Idem Swap AddR)
 
-lemma Chu3: \<open>\<turnstile> ((p \<rightarrow> (q \<rightarrow> r)) \<rightarrow> (q \<rightarrow> (p \<rightarrow> r)))\<close>
-  by (meson Chu2 Tran MP)
+lemma Perm: \<open>\<turnstile> ((p \<Or> q) \<rightarrow> (q \<Or> p))\<close>
+  by (metis Idem AddL AddR Swap MP)
 
-lemma Chu4: \<open>\<turnstile> ((q \<rightarrow> r) \<rightarrow> ((p \<rightarrow> q) \<rightarrow> (p \<rightarrow> r)))\<close>
-  by (meson Chu3 Tran MP)
+lemma SwapCon: \<open>\<turnstile> ((p \<rightarrow> (q \<Or> r)) \<rightarrow> (p \<rightarrow> (r \<Or> q)))\<close>
+  by (meson MP Perm Swap)
 
-lemma Imp2: \<open>\<turnstile> ((p \<rightarrow> (q \<rightarrow> r)) \<rightarrow> ((p \<rightarrow> q) \<rightarrow> (p \<rightarrow> r)))\<close>
-  by (meson Chu4 Chu1 Chu3 MP)
+lemma SubR: \<open>\<turnstile> ((p \<rightarrow> q) \<rightarrow> ((r \<Or> p) \<rightarrow> (r \<Or> q)))\<close>
+  by (meson MP SwapCon Swap)
 
-lemma Imp3: \<open>\<turnstile> (p \<rightarrow> p)\<close>
-  by (meson Imp1 Tran Clas MP)
+text \<open>Russell 1908 and Bernays 1926 [Church page 157]\<close>
 
-lemma Neg: \<open>\<turnstile> (((p \<rightarrow> \<bottom>) \<rightarrow> \<bottom>) \<rightarrow> p)\<close>
-  by (meson Chu4 Clas Expl MP)
-
-text \<open>Wajsberg 1939 building on work by Frege [Church page 163]\<close>
-
-inductive FW (\<open>\<tturnstile>\<close>) where
+inductive RB (\<open>\<tturnstile>\<close>) where
   \<open>\<tturnstile> q\<close> if \<open>\<tturnstile> p\<close> and \<open>\<tturnstile> (p \<rightarrow> q)\<close> |
-  \<open>\<tturnstile> (p \<rightarrow> (q \<rightarrow> p))\<close> |
-  \<open>\<tturnstile> ((p \<rightarrow> (q \<rightarrow> r)) \<rightarrow> ((p \<rightarrow> q) \<rightarrow> (p \<rightarrow> r)))\<close> |
-  \<open>\<tturnstile> (((p \<rightarrow> \<bottom>) \<rightarrow> \<bottom>) \<rightarrow> p)\<close>
+  \<open>\<tturnstile> ((p \<Or> p) \<rightarrow> p)\<close> |
+  \<open>\<tturnstile> (p \<rightarrow> (q \<Or> p))\<close> |
+  \<open>\<tturnstile> ((p \<Or> q) \<rightarrow> (q \<Or> p))\<close> |
+  \<open>\<tturnstile> ((p \<rightarrow> q) \<rightarrow> ((r \<Or> p) \<rightarrow> (r \<Or> q)))\<close>
 
-theorem Axiomatics_FW: \<open>\<turnstile> p \<longleftrightarrow> \<tturnstile> p\<close>
+theorem Axiomatics_RB: \<open>\<turnstile> p \<longleftrightarrow> \<tturnstile> p\<close>
 proof
-  have *: \<open>\<tturnstile> ((p \<rightarrow> q) \<rightarrow> ((q \<rightarrow> r) \<rightarrow> (p \<rightarrow> r)))\<close> for p q r
-    by (metis FW.intros(1-3))
-  then have **: \<open>\<tturnstile> (((p \<rightarrow> q) \<rightarrow> p) \<rightarrow> p)\<close> for p q
-    by (metis FW.intros(1-4))
   show \<open>\<turnstile> p\<close> if \<open>\<tturnstile> p\<close>
-    using that by induct (use Imp1 Imp2 Neg Axiomatics.intros in meson)+
+    using that by induct (use SubR Axiomatics.intros in meson)+
   show \<open>\<tturnstile> p\<close> if \<open>\<turnstile> p\<close>
-    using that by induct (use * ** FW.intros in meson)+
+    using that by induct (use RB.intros in meson)+
 qed
 
-lemma Neg1: \<open>\<turnstile> (p \<rightarrow> (Neg p \<rightarrow> q))\<close>
-  by (meson Chu3 Chu4 Expl MP)
+lemma SwapAnte: \<open>\<turnstile> (((p \<Or> q) \<rightarrow> r) \<rightarrow> ((q \<Or> p) \<rightarrow> r))\<close>
+  by (metis AddR Idem MP Perm Swap)
 
-lemma Neg2: \<open>\<turnstile> (Neg (p \<rightarrow> q) \<rightarrow> p)\<close>
-  by (metis Neg1 Tran MP Neg)
+lemma SubL: \<open>\<turnstile> ((p \<rightarrow> q) \<rightarrow> ((p \<Or> r) \<rightarrow> (q \<Or> r)))\<close>
+  by (meson MP SwapAnte Swap)
 
-lemma Neg3: \<open>\<turnstile> (Neg (p \<rightarrow> q) \<rightarrow> Neg q)\<close>
-  by (metis Imp1 Tran MP)
+lemma AddM: \<open>\<turnstile> ((p \<Or> q) \<rightarrow> ((p \<Or> r) \<Or> q))\<close>
+  by (meson SubL MP AddR)
+
+lemma Church1: \<open>\<turnstile> ((p \<Or> (p \<Or> q)) \<rightarrow> (p \<Or> q))\<close>
+  by (meson Idem MP SubL SubR AddR)
+
+lemma Church2: \<open>\<turnstile> (p \<Or> ((p \<Or> q) \<rightarrow> q))\<close>
+  by (metis Church1 MP Swap AddL AddM)
+
+lemma Imp1: \<open>\<turnstile> (p \<rightarrow> p)\<close>
+  by (metis Idem AddL AddR Swap MP)
+
+lemma Neg': \<open>\<turnstile> ((p \<Or> q) \<rightarrow> (Neg q \<rightarrow> p))\<close>
+  using Imp1 MP Swap by blast
+
+lemma Tran: \<open>\<turnstile> ((p \<rightarrow> q) \<rightarrow> ((q \<rightarrow> r) \<rightarrow> (p \<rightarrow> r)))\<close>
+  by (meson Neg' SubL MP)
+
+lemma Church3: \<open>\<turnstile> ((p \<rightarrow> (q \<rightarrow> r)) \<rightarrow> (q \<rightarrow> (p \<rightarrow> r)))\<close>
+  by (meson Church2 Tran MP)
+
+lemma Neg: \<open>\<turnstile> ((p \<rightarrow> \<bottom>) \<rightarrow> Neg p)\<close>
+  by (metis Church3 Imp1 MP Perm)
+
+lemma ImpER: \<open>\<turnstile> ((p \<Or> (q \<rightarrow> r)) \<rightarrow> (q \<rightarrow> (p \<Or> r)))\<close>
+  using SubR by (metis Church2 MP)
+
+lemma SubR': \<open>\<turnstile> ((p \<Or> q) \<rightarrow> ((q \<rightarrow> r) \<rightarrow> (p \<Or> r)))\<close>
+  using SubR Church3 MP by blast
+
+lemma SubL': \<open>\<turnstile> ((p \<Or> q) \<rightarrow> ((p \<rightarrow> r) \<rightarrow> (r \<Or> q)))\<close>
+  using SubL Church3 MP by blast
+
+lemma FalsityE': \<open>\<turnstile> ((p \<Or> q) \<rightarrow> ((Neg p \<Or> q) \<rightarrow> q))\<close>
+  by (meson SubR SubL' MP Idem)
+
+lemma FalsityE'': \<open>\<turnstile> ((Neg p \<Or> r) \<rightarrow> ((p \<Or> q) \<rightarrow> (q \<Or> r)))\<close>
+  by (meson ImpER MP SubR' SwapAnte)
+
+lemma FalsityEImpER: \<open>\<turnstile> ((Neg p \<Or> r) \<rightarrow> ((p \<Or> q) \<rightarrow> ((Neg q \<Or> r) \<rightarrow> r)))\<close>
+  using FalsityE'' FalsityE' by (meson SubR MP)
+
+lemma DisE: \<open>\<turnstile> ((p \<rightarrow> r) \<rightarrow> ((q \<rightarrow> r) \<rightarrow> ((p \<Or> q) \<rightarrow> r)))\<close>
+  using FalsityEImpER by (meson MP ImpER Tran)
+
+lemma Imp2: \<open>\<turnstile> ((p \<Or> (q \<rightarrow> r)) \<rightarrow> ((p \<Or> q) \<rightarrow> (p \<Or> r)))\<close>
+  using DisE SubR MP AddL AddR by metis
+
+lemma Imp2': \<open>\<turnstile> ((p \<rightarrow> q) \<rightarrow> ((p \<rightarrow> (q \<rightarrow> r)) \<rightarrow> (p \<rightarrow> r)))\<close>
+  by (metis AddL Imp2 Tran MP)
 
 primrec imply :: \<open>form list \<Rightarrow> form \<Rightarrow> form\<close> where
   \<open>imply [] q = q\<close>
 | \<open>imply (p # ps) q = (p \<rightarrow> imply ps q)\<close>
 
 lemma imply_head: \<open>\<turnstile> (imply (p # ps) p)\<close>
-  by (induct ps) (simp add: Imp3, metis Imp1 Imp2 MP imply.simps(2))
+  by (induct ps) (simp add: Imp1, metis AddL Imp2 MP imply.simps(2))
 
 lemma imply_Cons: \<open>\<turnstile> (imply ps q) \<Longrightarrow> \<turnstile> (imply (p # ps) q)\<close>
-  by (metis Imp1 MP imply.simps(2))
+  by (metis AddL MP imply.simps(2))
 
 lemma imply_mem: \<open>p \<in> set ps \<Longrightarrow> \<turnstile> (imply ps p)\<close>
   using imply_head imply_Cons by (induct ps) auto
@@ -118,15 +159,15 @@ lemma imply_MP: \<open>\<turnstile> (imply ps p \<rightarrow> (imply ps (p \<rig
 proof (induct ps)
   case Nil
   then show ?case
-    by (metis Imp1 Imp2 MP imply.simps(1))
+    by (simp add: Church2)
 next
   case (Cons r ps)
   then show ?case
   proof -
     have \<open>\<turnstile> ((r \<rightarrow> imply ps p) \<rightarrow> (r \<rightarrow> (imply ps (p \<rightarrow> q) \<rightarrow> imply ps q)))\<close>
-      by (meson Cons.hyps Imp1 Imp2 MP)
+      by (meson Cons.hyps AddL Imp2 MP)
     then have \<open>\<turnstile> ((r \<rightarrow> imply ps p) \<rightarrow> ((r \<rightarrow> imply ps (p \<rightarrow> q)) \<rightarrow> (r \<rightarrow> imply ps q)))\<close>
-      by (meson Imp2 Tran MP)
+      by (meson Imp2' Church3 Tran MP)
     then show ?thesis
       by simp
   qed
@@ -167,26 +208,28 @@ lemma cut: \<open>\<turnstile> (imply ps p) \<Longrightarrow> \<turnstile> (impl
   using deduct imply_mp' by blast
 
 lemma imply4: \<open>\<turnstile> (imply (p # q # ps) r) \<Longrightarrow> \<turnstile> (imply (q # p # ps) r)\<close>
-  by (metis Imp1 Imp2 MP imply.simps(2))
+  by (metis ImpER MP imply.simps(2))
 
 lemma cut': \<open>\<turnstile> (imply (p # ps) r) \<Longrightarrow> \<turnstile> (imply (q # ps) p) \<Longrightarrow> \<turnstile> (imply (q # ps) r)\<close>
   using imply_Cons cut imply4 by blast
 
 lemma imply_lift: \<open>\<turnstile> (p \<rightarrow> q) \<Longrightarrow> \<turnstile> (imply ps p \<rightarrow> imply ps q)\<close>
-proof (induct ps)
-  case (Cons r ps)
-  then show ?case
-    by (metis MP Chu4 imply.simps(2))
-qed simp
+  by (metis Imp1 add_imply imply.simps(2) imply_mp')
 
-lemma Neg': \<open>\<turnstile> (imply ps (Neg (Neg p)) \<rightarrow> imply ps p)\<close>
-  using Neg imply_lift by simp
+lemma DNeg: \<open>\<turnstile> (Neg (Neg p) \<rightarrow> p)\<close>
+  by (metis Idem AddR Swap MP)
+
+lemma imply_DNeg: \<open>\<turnstile> (imply ps (Neg (Neg p)) \<rightarrow> imply ps p)\<close>
+  using DNeg imply_lift by simp
 
 lemma Boole: \<open>\<turnstile> (imply ((Neg p) # ps) \<bottom>) \<Longrightarrow> \<turnstile> (imply ps p)\<close>
-  using deduct MP Neg' by blast
+  by (meson Neg MP imply_DNeg deduct imply_lift)
 
 lemma imply_front: \<open>\<turnstile> (imply S p) \<Longrightarrow> set S - {q} \<subseteq> set S' \<Longrightarrow> \<turnstile> (imply (q # S') p)\<close>
   by (metis Diff_single_insert imply_weaken list.set(2))
+
+lemma FalsityE: \<open>\<turnstile> (p \<rightarrow> (Neg p \<rightarrow> q))\<close>
+  using AddM Imp1 MP Perm by blast
 
 section \<open>Consistent\<close>
 
@@ -194,18 +237,18 @@ definition consistent :: \<open>form set \<Rightarrow> bool\<close> where
   \<open>consistent S \<equiv> \<nexists>S'. set S' \<subseteq> S \<and> \<turnstile> (imply S' \<bottom>)\<close>
 
 lemma UN_finite_bound:
-  assumes \<open>finite A\<close> \<open>A \<subseteq> (\<Union>n. f n)\<close>
-  shows \<open>\<exists>m :: nat. A \<subseteq> (\<Union>n \<le> m. f n)\<close>
+  assumes \<open>finite p\<close> \<open>p \<subseteq> (\<Union>n. f n)\<close>
+  shows \<open>\<exists>m :: nat. p \<subseteq> (\<Union>n \<le> m. f n)\<close>
   using assms
 proof (induct rule: finite_induct)
-  case (insert x A)
-  then obtain m where \<open>A \<subseteq> (\<Union>n \<le> m. f n)\<close>
+  case (insert x p)
+  then obtain m where \<open>p \<subseteq> (\<Union>n \<le> m. f n)\<close>
     by fast
-  then have \<open>A \<subseteq> (\<Union>n \<le> (m + k). f n)\<close> for k
+  then have \<open>p \<subseteq> (\<Union>n \<le> (m + k). f n)\<close> for k
     by fastforce
   moreover obtain m' where \<open>x \<in> f m'\<close>
     using insert(4) by blast
-  ultimately have \<open>{x} \<union> A \<subseteq> (\<Union>n \<le> m + m'. f n)\<close>
+  ultimately have \<open>{x} \<union> p \<subseteq> (\<Union>n \<le> m + m'. f n)\<close>
     by auto
   then show ?case
     by blast
@@ -225,9 +268,6 @@ definition Extend :: \<open>form set \<Rightarrow> (nat \<Rightarrow> form) \<Ri
 
 lemma Extend_subset: \<open>S \<subseteq> Extend S f\<close>
   unfolding Extend_def by (metis Union_upper extend.simps(1) range_eqI)
-
-lemma extend_chain: \<open>extend S f n \<subseteq> extend S f (Suc n)\<close>
-  by auto
 
 lemma extend_bound: \<open>(\<Union>n \<le> m. extend S f n) = extend S f m\<close>
   by (induct m) (simp_all add: atMost_Suc)
@@ -265,15 +305,13 @@ proof (rule ccontr)
   assume \<open>\<not> maximal (Extend S f)\<close>
   then obtain p where \<open>p \<notin> Extend S f\<close> \<open>consistent ({p} \<union> Extend S f)\<close>
     unfolding maximal_def using assms consistent_Extend by blast
-  obtain n where n: \<open>f n = p\<close>
+  obtain k where n: \<open>f k = p\<close>
     using \<open>surj f\<close> unfolding surj_def by metis
-  then have \<open>p \<notin> extend S f (Suc n)\<close>
+  then have \<open>p \<notin> extend S f (Suc k)\<close>
     using \<open>p \<notin> Extend S f\<close> unfolding Extend_def by blast
-  then have \<open>\<not> consistent ({p} \<union> extend S f n)\<close>
+  then have \<open>\<not> consistent ({p} \<union> extend S f k)\<close>
     using n by fastforce
-  moreover have \<open>p \<notin> extend S f n\<close>
-    using \<open>p \<notin> extend S f (Suc n)\<close> extend_chain by blast
-  then have \<open>{p} \<union> extend S f n \<subseteq> {p} \<union> Extend S f\<close>
+  moreover have \<open>{p} \<union> extend S f k \<subseteq> {p} \<union> Extend S f\<close>
     unfolding Extend_def by blast
   ultimately have \<open>\<not> consistent ({p} \<union> Extend S f)\<close>
     unfolding consistent_def by fastforce
@@ -283,18 +321,20 @@ qed
 
 section \<open>Hintikka\<close>
 
-definition hintikka :: \<open>form set \<Rightarrow> bool\<close> where
-  \<open>hintikka H \<equiv>
-    \<bottom> \<notin> H \<and>
-    (\<forall>n. Pro n \<in> H \<longrightarrow> (Neg (Pro n)) \<notin> H) \<and>
-    (\<forall>p q. (p \<rightarrow> q) \<in> H \<longrightarrow> (Neg p) \<in> H \<or> q \<in> H) \<and>
-    (\<forall>p q. (Neg (p \<rightarrow> q)) \<in> H \<longrightarrow> p \<in> H \<and> (Neg q) \<in> H)\<close>
+locale Hintikka =
+  fixes H :: \<open>form set\<close>
+  assumes
+    NoFalsity: \<open>\<bottom> \<notin> H\<close> and
+    ProP: \<open>Pro n \<in> H \<Longrightarrow> (Neg (Pro n)) \<notin> H\<close> and
+    DisP: \<open>(p \<Or> q) \<in> H \<Longrightarrow> p \<in> H \<or> q \<in> H\<close> and
+    DisN: \<open>(Neg (p \<Or> q)) \<in> H \<Longrightarrow> (Neg p) \<in> H \<and> (Neg q) \<in> H\<close> and
+    NegN: \<open>(Neg (Neg p)) \<in> H \<Longrightarrow> p \<in> H\<close>
 
 abbreviation (input) \<open>model H n \<equiv> Pro n \<in> H\<close>
 
-lemma hintikka_model: \<open>hintikka H \<Longrightarrow>
-                        (p \<in> H \<longrightarrow> (model H \<Turnstile> p)) \<and> ((Neg p) \<in> H \<longrightarrow> \<not> (model H \<Turnstile> p))\<close>
-  by (induct p) (simp; unfold hintikka_def, blast)+
+lemma Hintikka_model:
+  \<open>Hintikka H \<Longrightarrow> (p \<in> H \<longrightarrow> (model H \<Turnstile> p)) \<and> ((Neg p) \<in> H \<longrightarrow> \<not> (model H \<Turnstile> p))\<close>
+  by (induct p) (simp; unfold Hintikka_def, blast)+
 
 lemma inconsistent_head:
   assumes \<open>maximal S\<close> \<open>consistent S\<close> \<open>p \<notin> S\<close>
@@ -308,88 +348,89 @@ proof -
     using S'(2) by fast
 qed
 
-lemma hintikka_Extend:
+lemma Hintikka_Extend:
   assumes \<open>maximal S\<close> \<open>consistent S\<close>
-  shows \<open>hintikka S\<close>
-  unfolding hintikka_def
-proof safe
-  assume \<open>\<bottom> \<in> S\<close>
-  then show False
-    using assms(2) imply_head unfolding consistent_def
-    by (metis all_not_in_conv empty_set insert_subset list.simps(15) subsetI)
+  shows \<open>Hintikka S\<close>
+proof
+  show \<open>\<bottom> \<notin> S\<close>
+    using assms(2) imply_head imply_mem unfolding consistent_def
+    by (metis List.set_insert empty_set insert_Diff insert_is_Un singletonI sup.cobounded1)
 next
   fix n
-  assume \<open>Pro n \<in> S\<close> \<open>(Neg (Pro n)) \<in> S\<close>
+  assume \<open>Pro n \<in> S\<close>
   moreover have \<open>\<turnstile> (imply [Pro n, Neg (Pro n)] \<bottom>)\<close>
-    by (simp add: Neg1)
-  ultimately show False
+    by (simp add: FalsityE)
+  ultimately show \<open>(Neg (Pro n)) \<notin> S\<close>
     using assms(2) unfolding consistent_def
     by (metis bot.extremum empty_set insert_subset list.set(2))
 next
   fix p q
-  assume *: \<open>(p \<rightarrow> q) \<in> S\<close> \<open>q \<notin> S\<close>
-  then obtain Sq' where Sq': \<open>\<turnstile> (imply (q # Sq') \<bottom>)\<close> \<open>set Sq' \<subseteq> S\<close>
-    using assms inconsistent_head by blast
-
-  show \<open>(Neg p) \<in> S\<close>
-  proof (rule ccontr)
-    assume \<open>(Neg p) \<notin> S\<close>
-    then obtain Sp' where Sp': \<open>\<turnstile> (imply ((Neg p) # Sp') \<bottom>)\<close> \<open>set Sp' \<subseteq> S\<close>
+  assume *: \<open>(p \<Or> q) \<in> S\<close>
+  show \<open>p \<in> S \<or> q \<in> S\<close>
+  proof (rule disjCI, rule ccontr)
+    assume **: \<open>q \<notin> S\<close>
+    then obtain Sq' where Sq': \<open>\<turnstile> (imply (q # Sq') \<bottom>)\<close> \<open>set Sq' \<subseteq> S\<close>
       using assms inconsistent_head by blast
-
-    obtain S' where S': \<open>set S' = set Sp' \<union> set Sq'\<close>
-      by (meson set_append)
-    then have \<open>\<turnstile> (imply ((Neg p) # S') \<bottom>)\<close> \<open>\<turnstile> (imply (q # S') \<bottom>)\<close>
-    proof -
-      have \<open>set Sp' \<subseteq> set S'\<close>
-        using S' by blast
-      then show \<open>\<turnstile> (imply ((Neg p) # S') \<bottom>)\<close>
-        by (metis Sp'(1) deduct imply_weaken)
-      have \<open>set Sq' \<subseteq> set S'\<close>
-        using S' by blast
-      then show \<open>\<turnstile> (imply (q # S') \<bottom>)\<close>
-        by (metis Sq'(1) deduct imply_weaken)
-    qed
-    then have \<open>\<turnstile> (imply ((p \<rightarrow> q) # S') \<bottom>)\<close>
-      using Boole imply_Cons imply_head imply_mp' cut' by metis
-    moreover have \<open>set ((p \<rightarrow> q) # S') \<subseteq> S\<close>
-      using *(1) S' Sp'(2) Sq'(2) by auto
+    assume \<open>p \<notin> S\<close>
+    then obtain Sp' where Sp': \<open>\<turnstile> (imply (p # Sp') \<bottom>)\<close> \<open>set Sp' \<subseteq> S\<close>
+      using assms inconsistent_head by blast
+    obtain S' where S': \<open>set S' = set Sp' \<union> set Sq'\<close> \<open>set S' \<subseteq> S\<close>
+      using Sq'(2) Sp'(2) by (metis le_sup_iff set_union)
+    then have \<open>\<turnstile> (imply (p # S') \<bottom>)\<close> \<open>\<turnstile> (imply (q # S') \<bottom>)\<close>
+      using Sq' Sp' deduct imply_weaken by simp_all
+    then have \<open>\<turnstile> (imply ((p \<Or> q) # S') \<bottom>)\<close>
+      by (metis DisE MP imply.simps(2))
+    moreover have \<open>set ((p \<Or> q) # S') \<subseteq> S\<close>
+      using * S' Sp'(2) Sq'(2) by auto
     ultimately show False
       using assms unfolding consistent_def by blast
   qed
 next
   fix p q
-  assume *: \<open>(Neg (p \<rightarrow> q)) \<in> S\<close>
+  assume *: \<open>(Neg (p \<Or> q)) \<in> S\<close>
+  show \<open>(Neg p) \<in> S \<and> (Neg q) \<in> S\<close>
+  proof (rule conjI; rule ccontr)
+    assume \<open>(Neg p) \<notin> S\<close>
+    then obtain S' where S': \<open>\<turnstile> (imply ((Neg p) # S') \<bottom>)\<close> \<open>set S' \<subseteq> S - {Neg p}\<close>
+      using assms inconsistent_head by blast
+    moreover have \<open>\<turnstile> (imply ((Neg (p \<Or> q)) # S') (Neg p))\<close>
+      using Idem AddR Tran add_imply deduct MP by metis
+    ultimately have \<open>\<turnstile> (imply ((Neg (p \<Or> q)) # S') \<bottom>)\<close>
+      using cut' by blast
+    moreover have \<open>set ((Neg (p \<Or> q)) # S') \<subseteq> S\<close>
+      using * S'(2) by auto
+    ultimately show False
+      using assms unfolding consistent_def by blast
+  next
+    assume \<open>(Neg q) \<notin> S\<close>
+    then obtain S' where S': \<open>\<turnstile> (imply ((Neg q) # S') \<bottom>)\<close> \<open>set S' \<subseteq> S - {Neg q}\<close>
+      using assms inconsistent_head by blast
+    moreover have \<open>\<turnstile> (imply ((Neg (p \<Or> q)) # S') (Neg q))\<close>
+      using Idem AddR AddL Tran add_imply deduct MP Neg' by metis
+    ultimately have \<open>\<turnstile> (imply ((Neg (p \<Or> q)) # S') \<bottom>)\<close>
+      using cut' by blast
+    moreover have \<open>set ((Neg (p \<Or> q)) # S') \<subseteq> S\<close>
+      using *(1) S'(2) by auto
+    ultimately show False
+      using assms unfolding consistent_def by blast
+  qed
+next
+  fix p
+  assume *: \<open>(Neg (Neg p)) \<in> S\<close>
   show \<open>p \<in> S\<close>
   proof (rule ccontr)
     assume \<open>p \<notin> S\<close>
-    then obtain S' where S': \<open>\<turnstile> (imply (p # S') \<bottom>)\<close> \<open>set S' \<subseteq> S\<close>
+    then obtain SNA where SNA: \<open>\<turnstile> (imply (p # SNA) \<bottom>)\<close> \<open>set SNA \<subseteq> S\<close>
       using assms inconsistent_head by blast
-    moreover have \<open>\<turnstile> (imply ((Neg (p \<rightarrow> q)) # S') p)\<close>
-      using add_imply Neg2 deduct by blast
-    ultimately have \<open>\<turnstile> (imply ((Neg (p \<rightarrow> q)) # S') \<bottom>)\<close>
-      using cut' by blast
-    moreover have \<open>set ((Neg (p \<rightarrow> q)) # S') \<subseteq> S\<close>
-      using *(1) S'(2) by fastforce
-    ultimately show False
-      using assms unfolding consistent_def by blast
-  qed
-next
-  fix p q
-  assume *: \<open>(Neg (p \<rightarrow> q)) \<in> S\<close>
-  show \<open>(Neg q) \<in> S\<close>
-  proof (rule ccontr)
-    assume \<open>(Neg q) \<notin> S\<close>
-    then obtain S' where S': \<open>\<turnstile> (imply ((Neg q) # S') \<bottom>)\<close> \<open>set S' \<subseteq> S\<close>
-      using assms inconsistent_head by blast
-    moreover have \<open>\<turnstile> (imply ((Neg (p \<rightarrow> q)) # S') (Neg q))\<close>
-      using add_imply Neg3 deduct by blast
-    ultimately have \<open>\<turnstile> (imply ((Neg (p \<rightarrow> q)) # S') \<bottom>)\<close>
-      using cut' by blast
-    moreover have \<open>set ((Neg (p \<rightarrow> q)) # S') \<subseteq> S\<close>
-      using *(1) S'(2) by fastforce
-    ultimately show False
-      using assms unfolding consistent_def by blast
+    from * obtain SA where SA: \<open>\<turnstile> (imply SA p)\<close> \<open>set SA \<subseteq> S\<close>
+      using imply_DNeg MP
+      by (metis empty_set empty_subsetI imply_head insert_absorb insert_mono list.simps(15))
+    obtain S' where S': \<open>set S' = set SA \<union> set SNA\<close> \<open>set S' \<subseteq> S\<close>
+      using SA(2) SNA(2) by (metis Un_subset_iff set_union)
+    with SNA SA have \<open>\<turnstile> (imply (p # S') \<bottom>)\<close> \<open>\<turnstile> (imply S' p)\<close>
+      using deduct imply_weaken by simp_all
+    with S' assms show \<open>False\<close> unfolding consistent_def
+      using cut by meson
   qed
 qed
 
@@ -481,20 +522,19 @@ theorem diag_undiag_btree [simp]: \<open>diag_btree (undiag_btree t) = t\<close>
 declare diag_btree.simps [simp del] undiag_btree.simps [simp del]
 
 fun form_of_btree :: \<open>btree \<Rightarrow> form\<close> where
-  \<open>form_of_btree (Leaf 0) = Falsity\<close>
+  \<open>form_of_btree (Leaf n) = undefined\<close>
 | \<open>form_of_btree (Branch (Leaf 0) (Leaf n)) = Pro n\<close>
 | \<open>form_of_btree (Branch (Leaf (Suc 0)) (Branch t1 t2)) =
-     Imp (form_of_btree t1) (form_of_btree t2)\<close>
-| \<open>form_of_btree (Leaf (Suc _)) = undefined\<close>
-| \<open>form_of_btree (Branch (Leaf 0) (Branch _ _)) = undefined\<close>
+     Dis (form_of_btree t1) (form_of_btree t2)\<close>
+| \<open>form_of_btree (Branch (Leaf 0) (Branch t _)) = Neg (form_of_btree t)\<close>
 | \<open>form_of_btree (Branch (Leaf (Suc 0)) (Leaf _)) = undefined\<close>
 | \<open>form_of_btree (Branch (Leaf (Suc (Suc _))) _) = undefined\<close>
 | \<open>form_of_btree (Branch (Branch _ _) _) = undefined\<close>
 
 primrec btree_of_form :: \<open>form \<Rightarrow> btree\<close> where
-  \<open>btree_of_form Falsity = Leaf 0\<close>
-| \<open>btree_of_form (Pro n) = Branch (Leaf 0) (Leaf n)\<close>
-| \<open>btree_of_form (Imp p q) = Branch (Leaf (Suc 0))
+  \<open>btree_of_form (Pro n) = Branch (Leaf 0) (Leaf n)\<close>
+| \<open>btree_of_form (Neg p) = Branch (Leaf 0) (Branch (btree_of_form p) (Leaf 0))\<close>
+| \<open>btree_of_form (Dis p q) = Branch (Leaf (Suc 0))
      (Branch (btree_of_form p) (btree_of_form q))\<close>
 
 definition diag_form :: \<open>nat \<Rightarrow> form\<close> where
@@ -515,7 +555,7 @@ lemma surj_from_nat: \<open>surj from_nat\<close>
 section \<open>Completeness\<close>
 
 lemma imply_completeness:
-  assumes valid: \<open>\<forall>I. list_all (\<lambda>q. (I \<Turnstile> q)) ps \<longrightarrow> (I \<Turnstile> p)\<close>
+  assumes valid: \<open>\<forall>I s. list_all (\<lambda>q. (I \<Turnstile> q)) ps \<longrightarrow> (I \<Turnstile> p)\<close>
   shows \<open>\<turnstile> (imply ps p)\<close>
 proof (rule ccontr)
   assume \<open>\<not> \<turnstile> (imply ps p)\<close>
@@ -529,11 +569,11 @@ proof (rule ccontr)
     unfolding consistent_def using * imply_weaken by blast
   then have \<open>consistent ?H\<close> \<open>maximal ?H\<close>
     using consistent_Extend maximal_Extend surj_from_nat by blast+
-  then have \<open>hintikka ?H\<close>
-    using hintikka_Extend by blast
+  then have \<open>Hintikka ?H\<close>
+    using Hintikka_Extend by blast
 
   have \<open>model ?H \<Turnstile> p\<close> if \<open>p \<in> ?S\<close> for p
-    using that Extend_subset hintikka_model \<open>hintikka ?H\<close> by blast
+    using that Extend_subset Hintikka_model \<open>Hintikka ?H\<close> by blast
   then have \<open>model ?H \<Turnstile> (Neg p)\<close> \<open>list_all (\<lambda>p. (model ?H \<Turnstile> p)) ps\<close>
     unfolding list_all_def by fastforce+
   then have \<open>model ?H \<Turnstile> p\<close>
@@ -558,112 +598,34 @@ next
     unfolding valid_def by (intro allI)
 qed
 
-section \<open>Using Shortest Axiom for Implicational Logic - Łukasiewicz 1936/1937\<close>
+section \<open>Using Unnecessary Axiom in Principia Mathematica (PM) by Whitehead and Russell 1910\<close>
 
-text \<open>Łukasiewicz 1948 building on work by Wajsberg, Tarski and Bernays [Church page 159]\<close>
+text \<open>First appeared in Russell 1908 and derived from the other axioms in Bernays 1926 (system RB)\<close>
 
-inductive WL (\<open>\<then>\<close>) where
+inductive PM (\<open>\<then>\<close>) where
   \<open>\<then> q\<close> if \<open>\<then> p\<close> and \<open>\<then> (p \<rightarrow> q)\<close> |
-  \<open>\<then> (((p \<rightarrow> q) \<rightarrow> r) \<rightarrow> ((r \<rightarrow> p) \<rightarrow> (s \<rightarrow> p)))\<close> |
-  \<open>\<then> (\<bottom> \<rightarrow> p)\<close>
+  \<open>\<then> ((p \<Or> p) \<rightarrow> p)\<close> |
+  \<open>\<then> (p \<rightarrow> (q \<Or> p))\<close> |
+  \<open>\<then> ((p \<Or> q) \<rightarrow> (q \<Or> p))\<close> |
+  \<open>\<then> ((p \<Or> (q \<Or> r)) \<rightarrow> (q \<Or> (p \<Or> r)))\<close> |
+  \<open>\<then> ((p \<rightarrow> q) \<rightarrow> ((r \<Or> p) \<rightarrow> (r \<Or> q)))\<close>
 
-abbreviation (input) C :: \<open>form \<Rightarrow> form \<Rightarrow> form\<close> (\<open>C _ _\<close> [0, 0] 1) where \<open>(C p q) \<equiv> (p \<rightarrow> q)\<close>
-
-lemma l1: \<open>\<then> (C C C p q r C C r p C s p)\<close>
-  using WL.intros(2) .
-
-lemma l2: \<open>\<then> (C C C C r p C s p C p q C r C p q)\<close>
-  using l1 by (meson WL.intros(1))
-
-lemma l3: \<open>\<then> (C C C r C p q C C r p C s p C t C C r p C s p)\<close>
-  using l1 l2 by (meson WL.intros(1))
-
-lemma l4: \<open>\<then> (C C C p q p C s p)\<close>
-  using l3 l1 by (meson WL.intros(1))
-
-lemma l5: \<open>\<then> (C C C s p C p q C r C p q)\<close>
-  using l1 l4 by (meson WL.intros(1))
-
-lemma l6: \<open>\<then> (C C C r C p q C s p C t C s p)\<close>
-  using l1 l5 by (meson WL.intros(1))
-
-lemma l7: \<open>\<then> (C C C t C s p C r C p q C u C r C p q)\<close>
-  using l1 l6 by (meson WL.intros(1))
-
-lemma l8: \<open>\<then> (C C C s q p C q p)\<close>
-  using l7 l1 by (meson WL.intros(1))
-
-lemma l9: \<open>\<then> (C r C C r p C s p)\<close>
-  using l8 l1 by (meson WL.intros(1))
-
-lemma l10: \<open>\<then> (C C C C C r q p C s p r C t r)\<close>
-  using l1 l9 by (meson WL.intros(1))
-
-lemma l11: \<open>\<then> (C C C t r C C C r q p C s p C u C C C r q p C s p)\<close>
-  using l1 l10 by (meson WL.intros(1))
-
-lemma l12: \<open>\<then> (C C C u C C C r q p C s p C t r C v C t r)\<close>
-  using l1 l11 by (meson WL.intros(1))
-
-lemma l13: \<open>\<then> (C C C v C t r C u C C C r q p C s p C w C u C C C r q p C s p)\<close>
-  using l1 l12 by (meson WL.intros(1))
-
-lemma l14: \<open>\<then> (C C C t r C s p C C C r q p C s p)\<close>
-  using l13 l1 by (meson WL.intros(1))
-
-lemma l15: \<open>\<then> (C C C r q C s p C C r p C s p)\<close>
-  using l14 l1 by (meson WL.intros(1))
-
-lemma l16: \<open>\<then> (C C r C s p C C C r q p C s p)\<close>
-  using l15 l9 by (meson WL.intros(1))
-
-lemma l17: \<open>\<then> (C C C C C p q r t C s p C C r p C s p)\<close>
-  using l16 l1 by (meson WL.intros(1))
-
-lemma l18: \<open>\<then> (C C C C r p C s p C C C p q r t C u C C C p q r t)\<close>
-  using l1 l17 by (meson WL.intros(1))
-
-lemma l19: \<open>\<then> (C C C C s p q C r p C C C p q r C s p)\<close>
-  using l18 by (meson WL.intros(1))
-
-lemma l20: \<open>\<then> (C C C C r p p C s p C C C p q r C s p)\<close>
-  using l14 l19 by (meson WL.intros(1))
-
-lemma l21: \<open>\<then> (C C C C p r q q C C q r C p r)\<close>
-  using l20 l15 by (meson WL.intros(1))
-
-lemma l22: \<open>\<then> (C p p)\<close>
-  using l5 l4 by (meson WL.intros(1))
-
-lemma l23: \<open>\<then> (C C C p q r C C r p p)\<close>
-  using l20 l22 by (meson WL.intros(1))
-
-lemma l24: \<open>\<then> (C r C C r p p)\<close>
-  using l8 l23 by (meson WL.intros(1))
-
-lemma l25: \<open>\<then> (C C p q C C C p r q q)\<close>
-  using l15 l24 by (meson WL.intros(1))
-
-lemma l26: \<open>\<then> (C C C C p q C C q r C p r C C C p r q q C C C p r q q)\<close>
-  using l25 by (meson WL.intros(1))
-
-lemma l27: \<open>\<then> (C p C q p)\<close>
-  using l8 by (meson WL.intros(1))
-
-lemma l28: \<open>\<then> (C C C p q p p)\<close>
-  using l25 l22 by (meson WL.intros(1))
-
-lemma l29: \<open>\<then> (C C p q C C q r C p r)\<close>
-  using l21 l26 by (meson WL.intros(1))
+proposition PM_extends_RB: \<open>\<tturnstile> p \<Longrightarrow> \<then> p\<close>
+  by (induct rule: RB.induct) (auto intro: PM.intros)
 
 theorem equivalence: \<open>\<then> p \<longleftrightarrow> \<turnstile> p\<close>
 proof
-  have *: \<open>\<turnstile> (((p \<rightarrow> q) \<rightarrow> r) \<rightarrow> ((r \<rightarrow> p) \<rightarrow> (s \<rightarrow> p)))\<close> for p q r s
+  have *: \<open>\<turnstile> ((p \<Or> (q \<Or> r)) \<rightarrow> (q \<Or> (p \<Or> r)))\<close> for p q r
     using completeness by simp
   show \<open>\<turnstile> p\<close> if \<open>\<then> p\<close>
-    using that by induct (auto simp: * intro: Axiomatics.intros)
+    using that by induct (use * SubR Axiomatics.intros in meson)+
   show \<open>\<then> p\<close> if \<open>\<turnstile> p\<close>
-    using that by induct (auto simp: l27 l28 l29 intro: WL.intros)
+    using that by induct (use PM.intros in meson)+
 qed
+
+corollary associativity:
+  \<open>\<then> (((p \<Or> q) \<Or> r) \<rightarrow> (p \<Or> (q \<Or> r)))\<close>
+  \<open>\<then> ((p \<Or> (q \<Or> r)) \<rightarrow> ((p \<Or> q) \<Or> r))\<close>
+  using equivalence completeness by simp_all
 
 end
