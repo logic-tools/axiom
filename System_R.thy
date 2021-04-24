@@ -1,5 +1,5 @@
 (*
-   Authors: Asta Halkjær From, Jens Carl Moesgård Eschen & Jørgen Villadsen, DTU Compute
+   Authors: Asta Halkjær From, Agnes Moesgård Eschen & Jørgen Villadsen, DTU Compute
 *)
 
 chapter \<open>Formalizing Rasiowa's Axioms for Propositional Logic\<close>
