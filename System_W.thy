@@ -64,7 +64,7 @@ lemma Chu4: \<open>\<turnstile> ((q \<rightarrow> r) \<rightarrow> ((p \<rightar
   by (meson Chu3 Tran MP)
 
 lemma Imp2: \<open>\<turnstile> ((p \<rightarrow> (q \<rightarrow> r)) \<rightarrow> ((p \<rightarrow> q) \<rightarrow> (p \<rightarrow> r)))\<close>
-  by (meson Chu4 Chu1 Chu3 MP)
+  by (meson Chu4 Chu1 MP Chu3)
 
 lemma Imp3: \<open>\<turnstile> (p \<rightarrow> p)\<close>
   by (meson Imp1 Tran Clas MP)
